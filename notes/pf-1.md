@@ -1,9 +1,7 @@
-\tableofcontents 
 
-# Particle Filters
+\newpage 
 
-
-## Introduction
+# Bayesian Filters for Dynamic State Space Models
 
 Consider a discrete time system of states $\mb{x}_t$ which evolves according to a dynamic
 model
@@ -421,16 +419,17 @@ The green points are the initial condition, the red points are the observed path
 the blue points (plotted with uniform size which in this case is **not** representative
 of their weight) are the final points.  The black point, which has $w=1$ is totally *feasible* 
 but the rate at which it accumulated all weight is suprising.  However in the example
-in ElfringEtAl(2021) they describe 50% of points having zero weight after one iteration, and 
+in Elfring Et Al(2021) they describe 50% of points having zero weight after one iteration, and 
 after five iterations all weights are zero except for one point.  This is **very** similar to
-what I observer, so I think I'll just assume for now that what I've done is correct.  I will 
-move on and try and learn some more basics.
+what I observe, and if weights decrease in this normal model like ours the decrease will be 
+$\sim \mathrm{exp}\left(-(y-x)^2\right)$.  So I think I'll just assume for now that what I've 
+done is correct.  I will move on and try and learn some more basics.
 
 ![Thirty Iterations of Example 2 SIS Filter](ex23.png)
 
 ## Final Thoughts For Now
 
-At this point we have looked at basic SIS Filter and written code for a simple example.
+At this point we have looked at a basic SIS Filter and written code for a simple example.
 I think I get the idea and I want to move on.  We have also come across a couple of the 
 issues described nicely by Elfring Et Al (2021).  I will just list them here:
 
@@ -453,3 +452,9 @@ for a discussion of this point.
 
 * **Choosing g()** remains an obvious problem.  The choice made above $g=p(x_t|x_{t-1})$
 is a good one, but it is probably not possible in many cases.  In that case, what to do?
+
+We have covered the conceptual ideas required for particle filters, and more advanced
+topics appear to 
+
+* *practical work* involves fixing some of the problems we have already come across
+* *theoretical work* involves investigating distributional properties, convergence, etc etc
