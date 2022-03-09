@@ -43,6 +43,23 @@ derive them the *probability chain rule* (or telescope rule) is used extensively
                              = & p\left(x_n|x_{n-1}, \hdots x_1\right) p \left(x_{n-1}|x_{n-2},\hdots,x_0 \right) \hdots p \left(x_2|x_1 \right) p \left( x_1 \right) \nonumber
 }
 
+In the context of dynamic models the subscripts above will be a time index and the data 
+$\left\{x_1, \hdots, x_t\right\}$ are ordered (ie $x_{t-1}$ occurs before $x_{t}$).  Although
+the expression *transition kernal* has specific meaning when applied to dynamic systems I 
+use the expression to refer to any expression which modifies an expression available at time $t-1$
+to one at $t$.  In the above I would refer to
+\eqa{
+    p\left(x_{1:t}\right) = & p\left( x_t | x_{1:t-1} \right)\hdots p\left(x_2|x_1\right) p\left(x_1\right) \nonumber \\
+               = & k_{t-1,t} p\left( x_t | x_{1:t-1}\right) \nonumber
+}
+where 
+\eq{
+    k_{t-1,t} = p\left( x_{t-1} | x_{1:t-2} \right)\hdots p\left(x_2|x_1\right) p\left(x_1\right)
+}
+is the *transition kernal* which brings the expression $p\left( x_{t-1} | x_{1:t-2} \right)$
+to one at time $t$.  As we are developing online filtering methods the calculation of transition 
+kernals is a key focus of these notes.
+
 ## Inference, Estimation and Forecasting
 
 The two distributions $p(x_t | y_{1:t-1})$ and $p(x_t | y_{1:t})$ are computed using a system 
@@ -208,7 +225,7 @@ The estimator for this integral would be
 \eq{
     \widehat{I} = \sum \widehat{w} (x_i) f(x_i)  \qquad x_i \sim g(x)
 }
-where $w^{*}(x)$ can be either
+where $\widehat{w}(x)$ can be either
 \eq{
     \widehat{w}(x)=\frac{w(x_i)}{N}
 }
