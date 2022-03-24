@@ -1,0 +1,108 @@
+\newpage 
+
+# Volatility 
+
+## Implied Volatility 
+
+Consider a European call option with strike $K$ and expiry $T$ on an 
+underlying whose risk neutral dynamics are described by
+\eq{ dS/S = r dt + \sigma dB. }
+The Black-Scholes price of this option c_t(K,T) at time $t$ is given by
+\eq{ c_t(K,T) = exp(-r\tau) \mb{E}\left[ (S_T-K)^+ \right] }
+where $\tau=T-t$.  All data needed to compute this price is agreed on
+and publically available, with the exception of $\sigma$, the volatility
+of the underlying asset.  As such all options are parameterised by
+$\sigma$ - the only piece of the Black-Scholes pricing setup upon which
+traders may disagree.  It can be shown that price $c_t$ is a monotonic 
+(increasing) function of $\sigma$ so that Black-Scholes options can be 
+quoted interchangeably either as a price or as a volatility.  Given an
+observed price $\widehat{c}_t(K,T)$ in the market, there is a unique 
+volatility $\sigma=\Sigma$ which produces the observed price when inserted
+in the above Black-Scholes pricing formula.  This volaility $\Sigma$ is
+the *implied volatility*.
+
+Generally we have a grid of prices for each set of strikes and expiries.
+By the above logic all option these options are parameterised by the same
+underlying volatility $\sigma$.  But why then do we observe different
+implied volatilities across the grid?  Typically we interpret this as a 
+mix of supply/demand issues (eg large fund managers who are net long 
+equities may be willing to pay a premium - a higher implied volatility
+than expected - to buy some insurance against large equity price falls),
+or psychological factors like weighting the impact of losses more than 
+gains.  However, there may be something more that can be said here.
+
+## Local Volatility
+
+Assume that in reality the underlying evolves according to a more complex
+diffusion process
+\eq{ dS/S = r dt + \sigma(S,t)dB}
+so that variance is a *deterministic* function of $S$ and $t$ over the life
+of the option.  Such an asset will experience many different volatility
+regimes during the evolution $s_t \rightarrow s_T$ to expiry.  These 
+volatilities are referred to as *local volatility*, as they are different 
+across local regions in $S, t$ space.  
+
+Given a current value $s_t$ of the underlying, paths $s_t \rightarrow s_T$ 
+that end in the money (and therefore contribute to the expectation determining 
+the Black-Scholes price) are different for options with different strike 
+$K$ and expiry $T$.  Therefore, they will experience different values of 
+$\sigma(s,t)$.  The *implied volatility* of this option is the Black-Scholes
+volatility which reflects this local volatility experience.  This is another
+sense in which it maybe be intuitive for different options $c_t(K,T)$ to 
+have different *implied volatility* - traders are trying to account for 
+possible local volatility regimes price paths that end in the money are 
+likely to experience.  It can be shown that the implied volatility $\Sigma(K,T)$ 
+of the option with strike $K$ and expiry $T$ is *approximately* the average
+local volatility experienced by price paths between $s_t$ and $K$, where 
+the underlying expires in the money.
+
+## Local Volatility from Implied Volatility
+
+It is well known to traders that butterflies 
+\eq{\mrt{Butterfly}(K_2) = c(K_1)-2c(K_2)+c(K_3)}
+where $K_1<K_2<K_3$ are three evenly spaced strikes all at a particular
+expiry $T$, give insight into the risk neutral distribution of the underlying 
+$S_T$ at expiry.  The Breeden-Litzenberger formula formalises this idea
+\eq{p(s_T=K,T)=exp(-r \tau) \ppwrt{c_t(K,T)}{K}}.
+Critically, the left hand side $p(s_T=K,T)$ is the risk neutral probability
+that the underlying $S_t$ expires at $S_T=K$.  This motivates using derivatives
+of call prices in strike space $K$ to provide information about the underlying
+dynamics of $S_t$.  This is the insight in Dupire (1994) and the well known
+PDE he derives.
+
+I find the derivation in Derman \& Miller (2016) the most intuitive, and following
+it is insightful.  This is especially true for our look at stochastic volatility
+models.  That said, I will just include the tldr here for brevity.  They specify
+a very flexible local volatility process 
+\eqa{ dS/S &= r dt + \sigma(s,t,\hdots) dB \nonumber \\
+ &= r dt + \sigma(s,t,\varepsilon) dB
+}
+where $\varepsilon$ contains other variables in addition to $S$ and $t$ which
+affect local volatility, possibly including other stochastic processes.  Starting
+at the usual pricing equation
+\eq{ c_t(K,T) = exp(-r\tau) \mb{E}\left[ (S_T-K)H(S_T-K) \right] }
+where $\mb{E}$ is a risk neutral expectation over $S_T$ *and* any other stochastic
+variables that may be in $\varepsilon$.  The objective here is to take the 
+*total derivative* of $c_t(K,T)$ with respect to $T$ while keeping strike $K$  
+constant.  This induces a $dT$ as well as a stochastic change $dS_T$.  At a later
+date I will write notes on the derivation, but that this point it is enough to
+state that we arrive at the Dupire PDE
+\eq{ \pwrt{C}{T} |_K = -rK\pwrt{C}{K} |_T + \frac{1}{2} K^2 \ppwrt{C}{K}|_T 
+\mb{E}\left[ \sigma(S,T,\varepsilon)\right]}
+This PDE should be solved starting at expiry, so has *initial condition* 
+$C=\mrt{max}(S_T-K,0)$.  The expectation is the diffusion coefficient 
+which must be positive for the PDE to be meaningful.  It can be shown using
+arbitrage arguments that this is indeed the case.  
+
+How is the PDE useful?  Typically we rearrange
+\eq{
+    \frac{1}{2}\mb{E}\left[ \sigma(S,T,\varepsilon)\right] 
+    = \frac{\pwrt{C}{T} |_K + rK\pwrt{C}{K} |_T}{K^2 \ppwrt{C}{K}|_T}
+}
+which is an incredibly useful representation, given that we can (essentially) read 
+off all terms on the right hand side using observed market prices (we have to
+deal with the problem that prices are only available at discrete points 
+in $K$, $T$).  We know that prices and implied vols are interchangeable, so it
+is an exercise in chain rule to derive a similar equation using observed implied 
+volatility.
+            
