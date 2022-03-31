@@ -1,0 +1,19 @@
+CXX := /opt/homebrew/bin/g++-11
+CXXFLAGS := -std=c++20 -Wall -Werror
+SHELL=/bin/bash
+
+UtilModuleObjects := iUtil.o iUtilTime.o UtilTime.o
+UtilModuleCode := iUtilTime.cpp UtilTime.cpp iUtil.cpp
+libUtil.so: $(UtilModuleCode)
+	$(CXX) $(CXXFLAGS) -fmodules-ts -c -fpic iUtilTime.cpp UtilTime.cpp
+	$(CXX) $(CXXFLAGS) -fmodules-ts -c -fpic iUtil.cpp
+	$(CXX) $(CXXFLAGS) -shared -o libutil.so $(UtilModuleObjects)
+
+# make sure env var MILHOUSE is set to dir where milhouse is 
+LIBS := ${MILHOUSE}/code/lib/util
+test: test.cpp libutil.so
+	$(CXX) $(CXXFLAGS) -fmodules-ts test.cpp -lutil -L$(LIBS) -o test
+
+clean :
+	rm -f *.o *.so 
+	rm -f -R gcm.cache

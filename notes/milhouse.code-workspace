@@ -79,7 +79,16 @@
 			"vector": "cpp",
 			"*.tcc": "cpp",
 			"memory_resource": "cpp",
-			"stop_token": "cpp"
+			"stop_token": "cpp",
+			"iUtil.C": "cpp",
+			"iUtil.H": "cpp",
+			"Constant.C": "cpp",
+			"Integration.C": "cpp",
+			"SpecialFunction.C": "cpp",
+			"Time.C": "cpp",
+			"BlackScholes.C": "cpp",
+			"Infra.C": "cpp",
+			"iomanip": "cpp"
 		}
 	}
 }

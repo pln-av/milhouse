@@ -1,16 +1,14 @@
 #include <iostream>
 
-import Math;
+#include "lib/math/Math.H"
 
 int main()
 {
-    std::cout << "Test Math module."  << std::endl;
+    std::cout << "Test Option module."  << std::endl;
     
     for (int i=0; i<5; ++i) 
     {
-        std::cout << i << ", " << math::integration::func1(static_cast<double>(i)) 
-                       << ", " << math::integration::func2(static_cast<double>(i)) 
-                       << ", " << math::sf::normcdf(static_cast<float>(i)) 
-                       << ", " << math::sf::normcdf(static_cast<double>(i)) << '\n';
+        std::cout << i << ", " << math::integration::func(double(i)) 
+                       << ", " << math::sf::normcdf(double(i)) << '\n';
     }
 }
