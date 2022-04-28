@@ -88,7 +88,11 @@
 			"Time.C": "cpp",
 			"BlackScholes.C": "cpp",
 			"Infra.C": "cpp",
-			"iomanip": "cpp"
+			"iomanip": "cpp",
+			"iostream": "cpp",
+			"Vol.C": "cpp",
+			"sim.C": "cpp",
+			"Util.C": "cpp"
 		}
 	}
 }

@@ -1,6 +1,8 @@
 #include "lib/util/Time.H"
 #include <iomanip>
 #include <vector>
+#include <string>
+#include <iostream>
 
 // definitions here
 namespace util
@@ -56,10 +58,17 @@ namespace util
             uint64_t count{0};
             while (d0 < d1)
             {
-                if (weekday_only && is_weekday(d0))
+                if (weekday_only)
                 {
-                    ++count;
+                    // in this case, only increment count on weekdays
+                    count += is_weekday(d0) ? 1 : 0;
                 }
+                else 
+                {
+                    // in this case, always increment
+                    count += 1;
+                }
+             
                 d0 = date::sys_days{d0} + date::days{1};
             }
             return count;
@@ -137,6 +146,23 @@ namespace util
         {
             const Date df = Date{std::chrono::floor<std::chrono::days>(tf)};
             return tf - combine(df, std::chrono::minutes{0});
+        }
+
+        Date get_date(DateTime tf)
+        { 
+            return Date{date::floor<date::days>(tf)}; 
+        }
+        Date parse_date(std::string yyyymmdd)
+        {
+            if (yyyymmdd.size()!=8) 
+            {
+                std::cout << "Invalid YYYYMMDD string." << std::endl;
+                std::exit(1);
+            }
+            int32_t yyyy = std::stol( std::string(yyyymmdd.begin(), yyyymmdd.begin()+4) );
+            uint32_t mm = std::stoul (std::string( yyyymmdd.begin()+4, yyyymmdd.begin()+6));
+            uint32_t dd = std::stoul( std::string( yyyymmdd.begin()+6, yyyymmdd.end()));
+            return Date { date::year{yyyy}/date::month{mm}/date::day{dd} };
         }
 
         Date next_day(date::year_month_day ymd, int64_t d, bool only_wkday)

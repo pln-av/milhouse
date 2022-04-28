@@ -2,9 +2,9 @@ CXX := /opt/homebrew/bin/g++-11
 CXXFLAGS := -std=c++20 -Wall -Werror
 SHELL=/bin/bash
 
-libutil: Time.H Time.C
-	$(CXX) $(CXXFLAGS) -c -fpic -I${MILHOUSE}/code Time.C
-	$(CXX) $(CXXFLAGS) -shared -o libutil.so Time.o
+libutil: Time.H Time.C 
+	$(CXX) $(CXXFLAGS) -c -fpic -I${MILHOUSE}/code Time.C 
+	$(CXX) $(CXXFLAGS) -shared -o libutil.so Time.o 
 
 # make sure env var MILHOUSE is set to dir where milhouse is 
 LIBS := ${MILHOUSE}/code/lib/util

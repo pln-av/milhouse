@@ -1,0 +1,262 @@
+#include <memory>
+#include <unordered_map>
+#include <fstream>
+#include <random>
+
+#include "lib/option/Option.H"
+#include "lib/option/Infra.H"
+#include "lib/math/Constant.H"
+#include "lib/util/date.h"
+#include "lib/util/Time.H"
+#include "lib/util/Util.H"
+
+using ArgMap = std::unordered_map<std::string, std::string>;
+
+void error(const std::string &s)
+{
+    std::cout << s << std::endl;
+    std::exit(1);
+}
+
+const std::vector<std::string> reqArgs
+{"startDate", "expiries", "dates", "rate", "rho", "eta", "strikes", "optionOutput", "underlyingOutput", "s0", "optionNoiseMult"};
+
+bool valid_arg_name(const std::string &s)
+{
+    if (s.size() < 3)
+    {
+        std::cout << "Arg " + s + " must have size greater than 2." << std::endl;
+        return false;
+    }
+    if (((s[0] != '-') || (s[1] != '-')))
+    {
+        std::cout << "Arg name must start with --" << std::endl;
+        return false;
+    }
+    return true;
+}
+
+std::pair<util::time::DateTime, util::time::DateTime> parse_times(const ArgMap &args, util::time::Time expiryTime)
+{
+    // first construct the required calendards.
+    const util::time::Date d0 = util::time::parse_date(args.at("startDate"));
+    const util::time::Date df{util::time::next_day(d0, std::stol(args.at("dates")), true)};
+    const util::time::DateTime t0{util::time::combine(d0, expiryTime)};
+    const util::time::DateTime tf{util::time::combine(df, expiryTime)};
+    return std::make_pair(t0, tf);
+}
+
+[[nodiscard]] ArgMap read_cmd(int argc, char **argv)
+{
+    // some conventions
+    // all args are named and use double dash --
+    // no empty args are permitted
+    if (argc == 0)
+    {
+        error("No arguments supplied. This is an error.");
+    }
+
+    std::vector<std::string> args(argv + 1, argv + argc);
+    if (args.size() % 2 != 0)
+    {
+        error("Each arg must be named.  As such an even number or args is required.");
+    }
+    std::unordered_map<std::string, std::string> out;
+    for (size_t i = 0; i < args.size(); i += 2)
+    {
+        const std::string s0{args[i]};
+        const std::string s1{args[i + 1]};
+        if (!valid_arg_name(s0))
+        {
+            error("Invalid argument name.");
+        }
+        out[std::string{s0.begin() + 2, s0.end()}] = s1;
+    }
+    return out;
+}
+
+namespace util
+{
+    namespace sim
+    {
+        class SimulationWriter
+        {
+        public:
+            SimulationWriter(const std::string &ofn, const std::string &ufn) : _underFileName(ufn), _optionFileName(ofn)
+            {
+                // there are issues with fstream opening a non-existant file.  this is 
+                // a workaround.
+                _uf.open(_underFileName, std::ios_base::out);
+                _uf.close();  // now this exists.
+                _uf.open(_underFileName);
+                _uf << "Time,Spot\n";
+
+                _of.open(_optionFileName, std::ios_base::out);
+                _of.close();
+                _of.open(_optionFileName);
+                _of << "Time,Expiry,TTE,Strike,Price,Rate\n";
+
+                
+            }
+
+            ~SimulationWriter()
+            {
+                _of.close();
+                _uf.close();
+            }
+
+            void write(const util::time::DateTime &dt, double s)
+            {
+                _uf << util::time::to_string(dt) << "," << std::to_string(s) << std::endl;
+            }
+
+            void write(const util::time::DateTime &dt, const option::infra::OptionGrid &grid)
+            {
+                auto [nTerms, nStrikes] = grid.size();
+                const std::string t{util::time::to_string(dt)};
+                for (size_t i = 0; i < nTerms; ++i)
+                {
+                    const option::infra::Strip &strip = grid(i);
+                    const std::string expiry{util::time::to_string(strip.expiry)};
+                    const std::string tte{std::to_string(strip.tte)};
+                    const std::string rate{std::to_string(strip.rate)};
+                    for (size_t j = 0; j < nStrikes; ++j)
+                    {
+                        _of << t << "," << expiry
+                            << "," << tte
+                            << "," << std::to_string(strip.k[j])
+                            << "," << std::to_string(strip.c[j])
+                            << "," << rate
+                            << std::endl;
+                    }
+                }
+            }
+
+        private:
+            const std::string _underFileName;
+            const std::string _optionFileName;
+            std::fstream _of;
+            std::fstream _uf;
+        };
+
+        class SimulationEngine
+        {
+        public:
+            SimulationEngine(const option::infra::UnderlyingCalendar &uCal,
+                             const option::infra::OptionCalendar &oCal,
+                             option::infra::OptionGrid &grid,
+                             util::sim::SimulationWriter &writer,
+                             const ArgMap &args)
+                : _uCal(uCal), _oCal(oCal), _grid(grid), _writer(writer), _args(args), _simSize(uCal.size())
+            {
+                // SimulationEngine organises simulation data for the simulation.
+                // It contains a number of objects, so construction is a bit involved...
+                // In a next iteration we can template on vol types in particular
+                std::cout << " -- Simulation arguments: " << std::endl;
+                _printArgs(_args);
+                _uPrice.assign(_uCal.size(), 0.0);
+                _rate = std::stod(args.at("rate"));
+            }
+
+            template <typename AVol, typename Vol>
+            void initialise(AVol &&avol, Vol &&vol, double s0)
+            {
+                // this is here because in the future the options will be initialised
+                // from market data.
+                _update(std::forward<AVol>(avol), std::forward<Vol>(vol), s0, 0);
+                _initialised = true;
+            }
+
+            template <typename AVol, typename Vol>
+            void _update(AVol &&avol, Vol &&vol, double s0, size_t idx)
+            {
+                assert(idx < _uCal.size());
+                _uPrice[idx] = s0;
+                _grid.updateCalendar(_oCal, idx);
+                _grid.updateATMVol(avol);
+                _grid.updateStrike(s0, _rate, idx);
+                option::bs::priceBSGrid(_grid, std::forward<Vol>(vol));
+                return;
+            }
+            template <typename AVol, typename Vol>
+            void simulate(AVol &&avol, Vol &&vol, double noiseMult)
+            {
+                // verbose simulation
+                // idx=0 is the initial condition
+                if (!_initialised)
+                {
+                    std::cout << "simulate() called, but engine is not initialised. " << std::endl;
+                    std::exit(1);
+                }
+
+                // write out initial data
+
+                auto [currTime, _] = _uCal(0);
+                _writer.write(currTime, _uPrice[0]);
+                _writer.write(currTime, _grid);
+
+                // NB my time convention.  dt[i] = t[i]-t[i-1].  so when generating
+                // s[i], we are using dt[i]
+                for (size_t idx = 1; idx < _simSize; ++idx)
+                {
+                    const size_t prevIdx{idx - 1};
+                    const size_t currIdx{idx};
+
+                    // generate data for currIdx, using prevIdx
+                    // currTime = t[i]
+                    // dt = t[i] - t[i-1]
+                    auto [currTime, dt] = _uCal(currIdx);
+
+                    // data at prevIdx
+                    const double x0{0.0};
+                    const double t0{_grid(0).tte};
+                    const double s0{_uPrice[prevIdx]};
+                    const double k0{option::vol::atfm_k(s0, _rate, t0, x0)};
+
+                    // compute vols at prevIdx (ie lvolFM).  then interp back in tte to lvol0
+                    const double lvolFM{vol.lvol(s0, k0, _rate, t0)};
+                    const double lvol0{std::sqrt(_volFloor * _volFloor + t0 * lvolFM * lvolFM)};
+
+                    const double mean0{s0 + _rate * s0 * dt};
+                    const double vol0{lvol0 * s0 * std::sqrt(dt)};
+                    const double s1{mean0 + vol0 * _normdist(_gen)};
+
+                    // do updates, then print
+                    _update(avol, vol, s1, currIdx);
+                    _writer.write(currTime, s1);
+                    _writer.write(currTime, _grid);
+                }
+            }
+
+        private:
+            void _printArgs(const std::unordered_map<std::string, std::string> &s)
+            {
+                for (auto &&kv : s)
+                {
+                    std::cout << "    -- arg: " << kv.first << " || val: " << kv.second << "\n";
+                }
+            }
+
+        private:
+            // private data
+            const option::infra::UnderlyingCalendar &_uCal;
+            const option::infra::OptionCalendar &_oCal;
+            option::infra::OptionGrid &_grid;
+            SimulationWriter &_writer;
+            const std::unordered_map<std::string, std::string> &_args;
+            double _rate{0.0};
+            std::vector<double> _uPrice;
+
+            // internal data for tracking simulation
+            const size_t _simSize;
+            bool _initialised{false};
+
+            // random engines.  probably replace this
+            std::random_device _rd{};
+            std::mt19937_64 _gen{_rd()};
+            std::normal_distribution<double> _normdist{0.0, 1.0};
+
+            const double _volFloor{0.05};
+        };
+    }
+}

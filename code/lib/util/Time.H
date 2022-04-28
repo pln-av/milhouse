@@ -9,12 +9,19 @@ namespace util {
         using Time = std::chrono::minutes;
         using Date = date::year_month_day;
         using DateTime = date::sys_time<Time>;
+                
+        constexpr double days_per_year { 252.0 };
+        constexpr uint32_t hrs_per_day { 24 };
+        constexpr uint32_t mins_per_hour { 60 };
+        constexpr DateTime BaseTime { DateTime() };
 
         // probably put this all in some inbuilt DateTime object
         // for now these are just small conversion functions
         DateTime combine(Date d, Time m);
         Time get_time(DateTime tf);
-
+        Date get_date(DateTime tf);
+        Date parse_date(std::string yyyymmdd);
+        
         // some usefull tests
         bool is_weekend(Date d);
         bool is_weekday(Date d);

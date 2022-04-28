@@ -1,0 +1,3 @@
+#!/bin/bash
+#export ~/.bash_profile
+/Users/patricknoble/Documents/Projects/milhouse/code/bin/sim --startDate 20000103 --expiries 12 --strikes 100 --dates 1000 --eta 0.25 --rho -0.50 --rate 0.02 --optionOutput option.csv --underlyingOutput underlying.csv --s0 4000 --optionNoiseMult 0.1
