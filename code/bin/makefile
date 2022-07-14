@@ -5,7 +5,7 @@ LIB := ${MILHOUSE}/code/lib
 SHELL=/bin/bash
 
 LIBS := ${MILHOUSE}/code/lib/option
-sim: sim.C sim.H
+sim: sim.C
 	$(CXX) $(CXXFLAGS) sim.C -loption -lutil -lmath -L$(LIB)/util -L$(LIB)/option -L$(LIB)/math -I${MILHOUSE}/code -o sim 
 
 clean :

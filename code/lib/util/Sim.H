@@ -2,6 +2,8 @@
 #include <unordered_map>
 #include <fstream>
 #include <random>
+#include <cassert>
+#include <filesystem>
 
 #include "lib/option/Option.H"
 #include "lib/option/Infra.H"
@@ -10,127 +12,40 @@
 #include "lib/util/Time.H"
 #include "lib/util/Util.H"
 
-using ArgMap = std::unordered_map<std::string, std::string>;
-
-void error(const std::string &s)
-{
-    std::cout << s << std::endl;
-    std::exit(1);
-}
-
-const std::vector<std::string> reqArgs
-{"startDate", "expiries", "dates", "rate", "rho", "eta", "strikes", "optionOutput", "underlyingOutput", "s0", "optionNoiseMult"};
-
-bool valid_arg_name(const std::string &s)
-{
-    if (s.size() < 3)
-    {
-        std::cout << "Arg " + s + " must have size greater than 2." << std::endl;
-        return false;
-    }
-    if (((s[0] != '-') || (s[1] != '-')))
-    {
-        std::cout << "Arg name must start with --" << std::endl;
-        return false;
-    }
-    return true;
-}
-
-std::pair<util::time::DateTime, util::time::DateTime> parse_times(const ArgMap &args, util::time::Time expiryTime)
-{
-    // first construct the required calendards.
-    const util::time::Date d0 = util::time::parse_date(args.at("startDate"));
-    const util::time::Date df{util::time::next_day(d0, std::stol(args.at("dates")), true)};
-    const util::time::DateTime t0{util::time::combine(d0, expiryTime)};
-    const util::time::DateTime tf{util::time::combine(df, expiryTime)};
-    return std::make_pair(t0, tf);
-}
-
-[[nodiscard]] ArgMap read_cmd(int argc, char **argv)
-{
-    // some conventions
-    // all args are named and use double dash --
-    // no empty args are permitted
-    if (argc == 0)
-    {
-        error("No arguments supplied. This is an error.");
-    }
-
-    std::vector<std::string> args(argv + 1, argv + argc);
-    if (args.size() % 2 != 0)
-    {
-        error("Each arg must be named.  As such an even number or args is required.");
-    }
-    std::unordered_map<std::string, std::string> out;
-    for (size_t i = 0; i < args.size(); i += 2)
-    {
-        const std::string s0{args[i]};
-        const std::string s1{args[i + 1]};
-        if (!valid_arg_name(s0))
-        {
-            error("Invalid argument name.");
-        }
-        out[std::string{s0.begin() + 2, s0.end()}] = s1;
-    }
-    return out;
-}
 
 namespace util
 {
     namespace sim
     {
+        // not so sure where to put these...
+        uint64_t countFields(const std::string &s, char ch = ',')
+        {
+            return 1 + std::count(s.begin(), s.end(), ch);
+        }
+
+        void split_line(const std::string &str, std::vector<std::string> &v, char ch = ',')
+        {
+            assert(countFields(str) == v.size());
+            std::string l;
+            std::stringstream ss(str);
+            size_t idx{0};
+            while (std::getline(ss, l, ',')){ v[idx] = l; ++idx; }
+        }
+
+        std::vector<std::string> split_line(const std::string &str, char ch = ',')
+        {
+            std::vector<std::string> tmp(countFields(str, ch));
+            split_line(str, tmp, ch);
+            return tmp;
+        }
+
         class SimulationWriter
         {
         public:
-            SimulationWriter(const std::string &ofn, const std::string &ufn) : _underFileName(ufn), _optionFileName(ofn)
-            {
-                // there are issues with fstream opening a non-existant file.  this is 
-                // a workaround.
-                _uf.open(_underFileName, std::ios_base::out);
-                _uf.close();  // now this exists.
-                _uf.open(_underFileName);
-                _uf << "Time,Spot\n";
-
-                _of.open(_optionFileName, std::ios_base::out);
-                _of.close();
-                _of.open(_optionFileName);
-                _of << "Time,Expiry,TTE,Strike,Price,Rate\n";
-
-                
-            }
-
-            ~SimulationWriter()
-            {
-                _of.close();
-                _uf.close();
-            }
-
-            void write(const util::time::DateTime &dt, double s)
-            {
-                _uf << util::time::to_string(dt) << "," << std::to_string(s) << std::endl;
-            }
-
-            void write(const util::time::DateTime &dt, const option::infra::OptionGrid &grid)
-            {
-                auto [nTerms, nStrikes] = grid.size();
-                const std::string t{util::time::to_string(dt)};
-                for (size_t i = 0; i < nTerms; ++i)
-                {
-                    const option::infra::Strip &strip = grid(i);
-                    const std::string expiry{util::time::to_string(strip.expiry)};
-                    const std::string tte{std::to_string(strip.tte)};
-                    const std::string rate{std::to_string(strip.rate)};
-                    for (size_t j = 0; j < nStrikes; ++j)
-                    {
-                        _of << t << "," << expiry
-                            << "," << tte
-                            << "," << std::to_string(strip.k[j])
-                            << "," << std::to_string(strip.c[j])
-                            << "," << rate
-                            << std::endl;
-                    }
-                }
-            }
+            SimulationWriter(const std::string &ofn, const std::string &ufn); 
+            ~SimulationWriter();
+            void write(const util::time::DateTime &dt, double s);
+            void write(const util::time::DateTime &dt, const option::infra::OptionGrid &grid);
 
         private:
             const std::string _underFileName;
@@ -139,14 +54,49 @@ namespace util
             std::fstream _uf;
         };
 
+        class SimulationReader
+        {
+        public:
+            enum HEADER { Time, Expiry, TTE, Strike, Price, X, Rate, IVol, LVol };
+            size_t _fields {9};
+        // object to read from data files.  
+        // reads day by day, and can pass data for estimation
+            SimulationReader(const std::string& ofn, const std::string& ufn, size_t nT, size_t nK);
+            ~SimulationReader();
+      
+            // read the header, and return what the first date in the data set is
+            util::time::Date initialise(void);
+
+            // read the data and populate the EstimationOptionGrid
+            util::time::Date read(util::time::Date, option::infra::EstimationOptionGrid& grid);
+
+        private:
+
+            // files and their names
+            const std::string _optionFileName;
+            const std::string _underFileName;
+            
+            std::ifstream _of;
+            std::ifstream _uf;
+
+            // number of strikes and expiries per day, and a grid for writing
+            const size_t _nT;
+            const size_t _nK;
+
+            // two vectors for savings results, to prevent too many allocations
+            std::vector<std::string> _header;
+            std::vector<std::string>  _line;
+        };
+
         class SimulationEngine
         {
         public:
+            
             SimulationEngine(const option::infra::UnderlyingCalendar &uCal,
                              const option::infra::OptionCalendar &oCal,
-                             option::infra::OptionGrid &grid,
+                             option::infra::SimulationOptionGrid &grid,
                              util::sim::SimulationWriter &writer,
-                             const ArgMap &args)
+                             const std::unordered_map<std::string, std::string>& args)
                 : _uCal(uCal), _oCal(oCal), _grid(grid), _writer(writer), _args(args), _simSize(uCal.size())
             {
                 // SimulationEngine organises simulation data for the simulation.
@@ -172,9 +122,11 @@ namespace util
             {
                 assert(idx < _uCal.size());
                 _uPrice[idx] = s0;
+
                 _grid.updateCalendar(_oCal, idx);
                 _grid.updateATMVol(avol);
                 _grid.updateStrike(s0, _rate, idx);
+
                 option::bs::priceBSGrid(_grid, std::forward<Vol>(vol));
                 return;
             }
@@ -241,7 +193,7 @@ namespace util
             // private data
             const option::infra::UnderlyingCalendar &_uCal;
             const option::infra::OptionCalendar &_oCal;
-            option::infra::OptionGrid &_grid;
+            option::infra::SimulationOptionGrid &_grid;
             SimulationWriter &_writer;
             const std::unordered_map<std::string, std::string> &_args;
             double _rate{0.0};

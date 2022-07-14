@@ -154,10 +154,17 @@ namespace util
         }
         Date parse_date(std::string yyyymmdd)
         {
-            if (yyyymmdd.size()!=8) 
+            size_t n = yyyymmdd.size();
+            if (n<8) 
             {
                 std::cout << "Invalid YYYYMMDD string." << std::endl;
                 std::exit(1);
+            }
+
+            if (n>8)
+            {
+                const std::string tmp (yyyymmdd.begin(), yyyymmdd.begin()+8);
+                return parse_date(tmp);
             }
             int32_t yyyy = std::stol( std::string(yyyymmdd.begin(), yyyymmdd.begin()+4) );
             uint32_t mm = std::stoul (std::string( yyyymmdd.begin()+4, yyyymmdd.begin()+6));

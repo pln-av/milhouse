@@ -4,10 +4,73 @@
 #include <unordered_map>
 #include <cassert>
 
-#include "sim.H"
+#include "lib/util/Sim.H"
 
+using ArgMap = std::unordered_map<std::string, std::string>;
+const std::vector<std::string> reqArgs
+{   
+    "startDate", "expiries", "dates", "rate", 
+    "rho", "eta", "strikes", "optionOutput", 
+    "underlyingOutput", "s0", "optionNoiseMult"
+};
 
+std::pair<util::time::DateTime, util::time::DateTime> parse_times(const ArgMap &args, util::time::Time expiryTime)
+{
+    // first construct the required calendards.
+    const util::time::Date d0 { util::time::parse_date(args.at("startDate")) };
+    const util::time::Date df { util::time::next_day(d0, std::stol(args.at("dates")), true) };
+    const util::time::DateTime t0 {util::time::combine(d0, expiryTime) };
+    const util::time::DateTime tf {util::time::combine(df, expiryTime) };
+    return std::make_pair(t0, tf);
+}
 
+bool valid_arg_name(const std::string &s)
+{
+    if (s.size() < 3)
+    {
+        std::cout << "Arg " + s + " must have size greater than 2." << std::endl;
+        return false;
+    }
+    if (((s[0] != '-') || (s[1] != '-')))
+    {
+        std::cout << "Arg name must start with --" << std::endl;
+        return false;
+    }
+    return true;
+}
+
+[[nodiscard]] ArgMap read_cmd(int argc, char **argv)
+{
+    // some conventions
+    // all args are named and use double dash --
+    // no empty args are permitted
+    std::unordered_map<std::string, std::string> out;
+    if (argc == 0)
+    {
+        std::cout << "No arguments supplied. This is an error." << std::endl;
+        return out;
+    }
+
+    std::vector<std::string> args(argv + 1, argv + argc);
+    if (args.size() % 2 != 0)
+    {
+        std::cout << "Each arg must be named.  As such an even number or args is required." << std::endl;
+        return out;
+    }
+    
+    for (size_t i = 0; i < args.size(); i += 2)
+    {
+        const std::string s0{args[i]};
+        const std::string s1{args[i + 1]};
+        if (!valid_arg_name(s0))
+        {
+            std::cout << "Invalid argument name." << std::endl;
+            return out;
+        }
+        out[std::string{s0.begin() + 2, s0.end()}] = s1;
+    }
+    return out;
+}
 
 int main(int argc, char** argv)
 {
@@ -41,14 +104,17 @@ int main(int argc, char** argv)
     assert( underlyingCalendar.size() == optionCalendar.size() );
 
     // utility for writing the csv files we need
+    std::cout << "Constructing SimulationWriter." << std::endl;
     util::sim::SimulationWriter writer { args.at("optionOutput"), args.at("underlyingOutput") };
 
     // construct the {KxT} option grid 
-    option::infra::OptionGrid grid{ expiries.size(), std::stoul(args.at("strikes")), std::stod(args.at("rate")) };
+    std::cout << "Constructing SimulationOptionGrid." << std::endl;
+    option::infra::SimulationOptionGrid grid { expiries.size(), std::stoul(args.at("strikes")), std::stod(args.at("rate")) };
    
     // construct the SimulationEngine, which takes the calendars above
     // creates option grids, and begins the simulation
-    util::sim::SimulationEngine engine{ underlyingCalendar, optionCalendar, grid, writer, args };
+    std::cout << "Constructing SimulationEngine." << std::endl;
+    util::sim::SimulationEngine engine { underlyingCalendar, optionCalendar, grid, writer, args };
 
     // putting this here for now, I'm not sure what to do with it.
     const double optionNoiseMult { std::stod(args.at("optionNoiseMult")) };
@@ -63,7 +129,9 @@ int main(int argc, char** argv)
     const double rho { std::stod(args.at("rho")) };
     option::vol::Gatheral gatheral(atmVol, eta, rho);
 
+    std::cout << "Initialising Engine." << std::endl;
     engine.initialise( atmVol, gatheral, std::stod(args.at("s0")) );
+    std::cout << "Beginning simulation." << std::endl;
     engine.simulate(atmVol, gatheral, optionNoiseMult);
   
 }

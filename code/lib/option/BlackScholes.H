@@ -44,7 +44,7 @@ namespace option
         {   return s*std::exp(s/K) - r*tau; }
 
 
-        void priceBSGrid(option::infra::OptionGrid& grid, const option::vol::Gatheral& gatheral);
+        void priceBSGrid(option::infra::SimulationOptionGrid& grid, const option::vol::Gatheral& gatheral);
     }
 }
 

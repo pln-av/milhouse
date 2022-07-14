@@ -92,7 +92,11 @@
 			"iostream": "cpp",
 			"Vol.C": "cpp",
 			"sim.C": "cpp",
-			"Util.C": "cpp"
+			"Util.C": "cpp",
+			"codecvt": "cpp",
+			"fstream": "cpp",
+			"stack": "cpp",
+			"Main.C": "cpp"
 		}
 	}
 }

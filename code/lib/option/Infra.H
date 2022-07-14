@@ -53,10 +53,13 @@ namespace option
             Strip(uint64_t nStrikes=0, double rate=0.0);
             void resize(size_t n);
             size_t size(void) const { return nStrikes; }
-            std::vector<double> x;  // log moneyness
-            std::vector<double> k;  // dollar strike
-            std::vector<double> c;  // call prices
-            
+            std::vector<double> x;   // log moneyness
+            std::vector<double> k;   // dollar strike
+            std::vector<double> c;   // call prices
+            std::vector<double> iv;  // implied vol
+            std::vector<double> lv;  // local vol
+            std::vector<double> sns; // our strikes in sns space. maybe wasted here...
+
             uint64_t nStrikes;
 
             util::time::DateTime expiry { util::time::BaseTime };
@@ -67,7 +70,7 @@ namespace option
 
             const double _minSNS { -3.0 };
             const double _maxSNS { 3.0 };
-            std::vector<double> sns; // our strikes in sns space. maybe wasted here...
+            
             void setSNS(void);
           
         };
@@ -85,8 +88,17 @@ namespace option
             std::pair<size_t, size_t> size(void) const { return std::make_pair(_nTerms, _nStrikes); };
             const Strip& operator()(size_t i) const;
             Strip& operator()(size_t i);
-            void updateCalendar(const OptionCalendar& calendar, size_t i);
+        protected:
+            std::vector<Strip> _optionGrid;
+            
+        };
 
+        class SimulationOptionGrid : public OptionGrid 
+        {
+        public:
+            SimulationOptionGrid(size_t nTerms, size_t nStrikes, double rate);
+            void updateCalendar(const OptionCalendar& calendar, size_t i);
+            void updateStrike(double currUnderlying, double rate, size_t idx);
             template <typename ATMVol>
             void updateATMVol(ATMVol vf)
             {
@@ -96,16 +108,14 @@ namespace option
                     _optionGrid[j].atmImpliedVol = vf.atm(_optionGrid[j].tte);
                 }
             }
-
-            void updateStrike(double currunderlying, double rate, size_t idx);
-
-            
-        private:
-            std::vector<Strip> _optionGrid;
         };
 
-
-    }
-}
+        class EstimationOptionGrid : public OptionGrid 
+        {
+        public:
+            EstimationOptionGrid(size_t nTerms, size_t nStrikes, double rate=0.0);
+        };
+    }  // namespace infra
+} // namespace option
 
 

@@ -111,18 +111,17 @@ namespace option
             }
         }
 
-        Strip::Strip(uint64_t nStrikes, double rate) : nStrikes(nStrikes), rate (rate)
-        {
-            
-
-        };
+        Strip::Strip(uint64_t nStrikes, double rate) : nStrikes(nStrikes), rate (rate){};
+        
         void Strip::resize(size_t n)
         {
             assert(n>0);
             x.resize(n);
             k.resize(n);
             c.resize(n);
-            sns.resize(n);        
+            sns.resize(n); 
+            lv.resize(n);
+            iv.resize(n);       
         }
 
         void Strip::setSNS(void)
@@ -146,8 +145,9 @@ namespace option
 
         const Strip& OptionGrid::operator()(size_t i) const { return _optionGrid[i]; };
         Strip& OptionGrid::operator()(size_t i) { return _optionGrid[i]; }
-
-        void OptionGrid::updateCalendar(const OptionCalendar &calendar, size_t i)
+        
+        SimulationOptionGrid::SimulationOptionGrid(size_t nT, size_t nK, double r) : OptionGrid(nT,nK,r) {};
+        void SimulationOptionGrid::updateCalendar(const OptionCalendar &calendar, size_t i)
         {
             assert(i < calendar.size());
 
@@ -163,7 +163,7 @@ namespace option
 
         }
 
-        void OptionGrid::updateStrike(double currUnderlying, double rate, size_t idx)
+        void SimulationOptionGrid::updateStrike(double currUnderlying, double rate, size_t idx)
         {
             // use curr spot to compute x = log(k/F) = log(k/S) - r*tau across each strip
             for (auto&& strip : _optionGrid)
@@ -177,15 +177,9 @@ namespace option
                     strip.k[i] = fwd*std::exp(strip.sns[i] * fwdVol);  
                     strip.x[i] = strip.sns[i] * fwdVol;   // do we need this?
                 }
-                
-
             }
-
-  
         }
 
-        
-
-
+        EstimationOptionGrid::EstimationOptionGrid(size_t nT, size_t nK, double r) : OptionGrid(nT,nK,r) {};
     }
 }
